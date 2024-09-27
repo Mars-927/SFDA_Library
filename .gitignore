@@ -1,5 +1,5 @@
 # other
-process/*
+process/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
