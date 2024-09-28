@@ -14,9 +14,9 @@ from utils.Project_Record import Project
 def train_target(args, dataset_dirt):
     feature_net = resnet(args.net).cuda()
     classifier_net = feat_classifier(class_num = args.class_num).cuda()
-    feature_net.load_state_dict(os.path.join(args.weight_basepath, f"resnet_{args.source_domain}.pt"))
+    feature_net.load_state_dict(torch.load(os.path.join(args.weight_basepath, f"resnet_{args.source_domain}.pt")))
     feature_net.train()
-    classifier_net.load_state_dict(os.path.join(args.weight_basepath, f"classifier_{args.source_domain}.pt"))
+    classifier_net.load_state_dict(torch.load(os.path.join(args.weight_basepath, f"classifier_{args.source_domain}.pt")))
     classifier_net.eval()
 
     for k, v in classifier_net.named_parameters():
@@ -39,6 +39,7 @@ def train_target(args, dataset_dirt):
     max_iter = args.max_epoch * len(dataset_dirt["train"])
     interval_iter = max_iter // args.interval
     iter_num = 0
+    best = 0
 
     while iter_num < max_iter:
         # prepare 
@@ -67,7 +68,7 @@ def train_target(args, dataset_dirt):
         outputs_test = classifier_net(features_test)
         if args.cls_par > 0:
             pred = mem_label[tar_idx]
-            classifier_loss = nn.CrossEntropyLoss()(outputs_test, pred)
+            classifier_loss = nn.CrossEntropyLoss()(outputs_test, pred.long())
             classifier_loss *= args.cls_par
         else:
             classifier_loss = torch.tensor(0.0).cuda()
@@ -89,19 +90,17 @@ def train_target(args, dataset_dirt):
         if iter_num % interval_iter == 0 or iter_num == max_iter:
             feature_net.eval()
             acc = test_domain(feature_net, classifier_net, dataset_dirt["test"])
-            log_str = 'Task: Train {}, Iter:{}/{}; Accuracy = {:.4f}%'.format(args.Target, iter_num, max_iter, acc)
+            log_str = 'Task: Train {}, Iter:{}/{}; Accuracy = {:.4f}%'.format(args.target_domain, iter_num, max_iter, acc)
             Project.log(log_str)
             feature_net.train()
-
-
-    torch.save(feature_net, os.path.join(args.output_dir_src, f"resnet_{args.source_domain}_{args.target_domain}.pt"))
-    torch.save(classifier_net, os.path.join(args.output_dir_src, f"classifier_{args.source_domain}_{args.target_domain}.pt"))
+            if best > acc:
+                torch.save(feature_net.state_dict(), os.path.join(args.output_dir_src, f"resnet_{args.source_domain}2{args.target_domain}.pt"))
+                torch.save(classifier_net.state_dict(), os.path.join(args.output_dir_src, f"classifier_{args.source_domain}2{args.target_domain}.pt"))
 
 
 def shot_tar(args, dataset_dirt):
     args.max_epoch = 15
     args.interval = 15
-    args.batch_size = 64
     args.lr = 1e-2
     args.net = "resnet50"
     args.gent = True
@@ -115,5 +114,4 @@ def shot_tar(args, dataset_dirt):
     args.epsilon = 1e-5
     args.distance = "cosine"      # euclidean
     args.output_dir_src = Project.root_path
-    args.weight_basepath = ""
     train_target(args, dataset_dirt)

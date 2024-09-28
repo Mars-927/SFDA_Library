@@ -126,123 +126,6 @@ def get_dataloader(args, domain, is_preread = True):
     args.all_dataset_size = len(train_dataset)
     return dataset_dirt
 
-class dataset_read_CTRR(Dataset):
-    def __init__(self, image_list, image_base, is_preread = True, only_clear = True):
-        self.pre_read = []
-        self.is_preread = is_preread
-        self.imgs = make_dataset(image_list)
-        self.images_size = len(self.imgs)
-        self.only_clear = only_clear
-        self.define_transform()
-
-        if is_preread:
-            for index in tqdm(range(self.images_size),desc=f"read dataset"):
-                item = self.imgs[index]
-                imgs_path, imgs_label = item
-                imgs = RGB_loader(os.path.join(image_base,imgs_path))
-                if only_clear:
-                    self.pre_read.append({
-                        "img":self.clear_transform(imgs),
-                        "label":imgs_label,
-                        "path":imgs_path,
-                        "index":index
-                    })
-                else:
-                    self.pre_read.append({
-                        "img":self.clear_transform(imgs),
-                        "train_cls_transformcon":self.train_cls_transformcon(imgs),
-                        "train_transforms_1":self.train_transforms(imgs),
-                        "train_transforms_2":self.train_transforms(imgs),
-                        "test_transform":self.test_transform(imgs),
-                        "label":imgs_label,
-                        "path":imgs_path,
-                        "index":index
-                    })
-        else:
-            # only RGB_loader
-            for index in tqdm(range(self.images_size),desc=f"read dataset"):
-                item = self.imgs[index]
-                imgs_path, _ = item
-                imgs = RGB_loader(os.path.join(image_base,imgs_path))
-                self.pre_read.append(imgs)
-
-    def __getitem__(self, index):
-        if self.is_preread:
-            return self.pre_read[index]
-        else:
-            imgs_path, imgs_label = self.imgs[index]
-            imgs = self.pre_read[index]
-            if self.only_clear:
-                return {
-                        "img":self.clear_transform(imgs),
-                        "label":imgs_label,
-                        "path":imgs_path,
-                        "index":index
-                    }
-            else:
-                return {
-                        "img":self.clear_transform(imgs),
-                        "train_cls_transformcon":self.train_cls_transformcon(imgs),
-                        "train_transforms_1":self.train_transforms(imgs),
-                        "train_transforms_2":self.train_transforms(imgs),
-                        "label":imgs_label,
-                        "path":imgs_path,
-                        "index":index
-                    }
-
-    def __len__(self):
-        return len(self.imgs)
-
-    def define_transform(self):
-        self.train_transforms = transforms.Compose([
-            transforms.RandomResizedCrop(224, scale=(0.2, 1.)),
-            transforms.RandomHorizontalFlip(),
-            transforms.RandomApply([
-                transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
-            ], p=0.8),
-            transforms.RandomGrayscale(p=0.2),
-            transforms.ToTensor(),
-            transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])
-        ])
-        self.train_cls_transformcon = transforms.Compose([
-            transforms.RandomResizedCrop(224),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])
-            ])
-        self.test_transform = transforms.Compose([
-            transforms.Resize((224, 224)),
-            transforms.ToTensor(),
-            transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])
-            ])
-        self.clear_transform = transforms.Compose([
-            transforms.Resize((224, 224)),
-            transforms.ToTensor(), 
-            transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])
-        ])
-
-def get_dataloader_CTRR(args, domain, is_preread = True):
-    txt_path = os.path.join(args.dataset_path,f"{domain}.txt")
-    image_path = os.path.join(args.image_root,domain)
-    dataset_dirt = {}
-    dataset_txt = open(txt_path).readlines()
-    dataset_size = len(dataset_txt)
-    train_size = int(dataset_size * 0.8)
-    test_size = dataset_size - train_size
-    train_list, test_list = torch.utils.data.random_split(dataset_txt, [train_size, test_size])
-
-    train_dataset = dataset_read_CTRR(train_list, image_base=image_path, is_preread=is_preread,only_clear=False)
-    test_dataset = dataset_read_CTRR(test_list, image_base=image_path, is_preread=is_preread)
-    all_dataset = dataset_read_CTRR(dataset_txt, image_base=image_path, is_preread=is_preread)
-    dataset_dirt["train"] = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, drop_last=False, pin_memory=True)
-    dataset_dirt["test"] = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=True, drop_last=False, pin_memory=True)
-    dataset_dirt["all"] = DataLoader(all_dataset, batch_size=args.batch_size, shuffle=True, drop_last=False, pin_memory=True)
-    args.train_dataset_size = len(train_dataset)
-    args.test_dataset_size = len(test_dataset)
-    args.all_dataset_size = len(all_dataset)
-    return dataset_dirt
-
-
 
 class dataset_shot(Dataset):
     def __init__(self, image_list, image_base, isTrian = True):
@@ -364,10 +247,23 @@ class dataset_guidingPseudoSFDA(Dataset):
             weak_augmented = self.train_weak_transform(imgs)
             strong_augmented = self.strong_transform(imgs)
             strong_augmented2 = self.strong_transform(imgs)
-            return weak_augmented, strong_augmented, imgs_label, index, None, strong_augmented2
+            return {
+                "weak_augmented":weak_augmented,
+                "strong_augmented":strong_augmented,
+                "strong_augmented2":strong_augmented2,
+                "imgs_label":imgs_label,
+                "index":index,
+            }
+        
+        # weak_augmented, strong_augmented, imgs_label, index, None, strong_augmented2
         else:
             weak_augmented = self.imgs_test[index]
-            return weak_augmented, None, imgs_label, index, None, None
+            return {
+                "img":weak_augmented,
+                "label":imgs_label,
+                "index":index
+            }
+            # return weak_augmented, None, imgs_label, index, None, None
         
         
     def __len__(self):
@@ -408,6 +304,7 @@ def get_dataloader_select(args, domain):
 
     if args.method == 'guidingPseudoSFDA':
         dataset_read = dataset_guidingPseudoSFDA
+        train_list, test_list = dataset_txt, dataset_txt
         
 
     elif args.method == 'source_shot':

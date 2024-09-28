@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import os
 from model.Resnet import Resnet50,Classifier
-
+from sklearn.metrics import accuracy_score
 
 def entropy(p, axis=1):
     return -torch.sum(p * torch.log2(p+1e-5), dim=axis)
@@ -99,3 +99,36 @@ def save_weights(model, e, filename):
     if not os.path.exists(os.path.dirname(filename)):
         os.makedirs(os.path.dirname(filename))
     torch.save({'epochs': e,'weights': model.state_dict()}, filename)
+
+
+@torch.no_grad()
+def eval_and_label_dataset(model, test_loader, num_neighbors):
+    model.eval()
+    logits, indices, gt_labels = [], [], []
+    features = []
+    for _, batch in enumerate(test_loader):
+
+        inputs = batch["weak_augmented"].cuda()
+        targets = batch["imgs_label"].cuda()
+        idxs = batch["index"].cuda()
+
+        feats, logits_cls = model(inputs, cls_only=True)
+        features.append(feats)
+        gt_labels.append(targets)
+        logits.append(logits_cls)
+        indices.append(idxs)            
+    features = torch.cat(features)
+    gt_labels = torch.cat(gt_labels)
+    logits = torch.cat(logits)
+    indices = torch.cat(indices)
+
+    probs = F.softmax(logits, dim=1)
+    rand_idxs = torch.randperm(len(features)).cuda()
+    banks = {"features": features[rand_idxs][: 16384],"probs": probs[rand_idxs][: 16384],"ptr": 0,}
+
+    # refine predicted labels
+    pred_labels, _, _, _ = refine_predictions(features, probs, banks, num_neighbors) 
+
+    # acc使用accuracy_score函数计算
+    acc = 100.0 * accuracy_score(gt_labels.to('cpu'), pred_labels.to('cpu'))          
+    return acc, banks, gt_labels, pred_labels
