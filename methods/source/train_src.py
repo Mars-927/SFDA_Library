@@ -69,10 +69,11 @@ def train_source(args,domain):
     torch.save(classifier.state_dict(), Project.get_folder("root") + f'/classifier_{domain}.pt')
     
 
+def train_src():
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='ATMCD')
-    parser.add_argument('--name', type=str, default="AID_NWPU_UCM_Source")
+
+    parser = argparse.ArgumentParser(description='SFDA')
+    parser.add_argument('--name', type=str, default="Train Source")
     parser.add_argument('--dataset', type=str, default="AID_NWPU_UCM",  choices = ["AID_NWPU_UCM"])
     parser.add_argument('--epoch', type=int, default=25)
     parser.add_argument('--batch_size', type=int, default=8)
@@ -82,15 +83,15 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
-    seed_everything(args.seed)
+    
     Project(args.name)
 
     if args.dataset == "AID_NWPU_UCM":
         args.class_num = 10
         args.dataset_path = "dataset/AID_NWPU_UCM"
         args.image_root = "F:/HANS/!dataset/RS_DomainAdaptation_AIDUCMNWPU"
-        args.domains = ["AID","NWPU-RESISC45","UCMerced_LandUse"]
+        args.domains = ["AID", "NWPU-RESISC45", "UCMerced_LandUse"]
         for source in args.domains:
-            train_source(args,source)
+            train_source(args, source)
     else:
         print("unknown dataset")
