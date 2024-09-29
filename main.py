@@ -4,6 +4,7 @@ import os
 from methods.guidingPseudoSFDA.train_tar_guidingPseudoSFDA import guidingPseudoSFDA_tar
 from methods.SHOT.train_src_shot import shot_src
 from methods.SHOT.train_tar_shot import shot_tar
+from methods.NRC.train_tar_nrc import nrc_tar
 from utils.Dataset import get_dataloader_select
 from utils.Evaluate import test_target_shot
 from utils.Other import seed_everything
@@ -29,6 +30,7 @@ if __name__ == "__main__":
         'source_shot': shot_src,
         'shot': shot_tar,
         'guidingPseudoSFDA':guidingPseudoSFDA_tar,
+        'nrc': nrc_tar,
     }
 
 

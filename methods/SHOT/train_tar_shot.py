@@ -57,7 +57,7 @@ def train_target(args, dataset_dirt):
         # get pseudo, ever interval iter
         if iter_num % interval_iter == 0 and args.cls_par > 0:
             feature_net.eval()
-            mem_label = obtain_label(dataset_dirt["train"], feature_net, classifier_net, args)
+            mem_label = obtain_label(dataset_dirt["train"], feature_net, classifier_net, args)      # get pseudo label by deep cluster
             mem_label = torch.from_numpy(mem_label).cuda()
             feature_net.train()
         iter_num += 1
@@ -68,18 +68,18 @@ def train_target(args, dataset_dirt):
         outputs_test = classifier_net(features_test)
         if args.cls_par > 0:
             pred = mem_label[tar_idx]
-            classifier_loss = nn.CrossEntropyLoss()(outputs_test, pred.long())
+            classifier_loss = nn.CrossEntropyLoss()(outputs_test, pred.long())                  # pseudo ce
             classifier_loss *= args.cls_par
         else:
             classifier_loss = torch.tensor(0.0).cuda()
 
         if args.ent:
             softmax_out = nn.Softmax(dim=1)(outputs_test)
-            entropy_loss = torch.mean(Entropy(softmax_out))
+            entropy_loss = torch.mean(Entropy(softmax_out))                                     # ent
             if args.gent:
                 msoftmax = softmax_out.mean(dim=0)
-                gentropy_loss = torch.sum(-msoftmax * torch.log(msoftmax + args.epsilon))
-                entropy_loss -= gentropy_loss
+                gentropy_loss = torch.sum(-msoftmax * torch.log(msoftmax + args.epsilon))       # div
+                entropy_loss -= gentropy_loss 
             im_loss = entropy_loss * args.ent_par
             classifier_loss += im_loss
         optimizer.zero_grad()

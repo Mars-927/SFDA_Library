@@ -1,11 +1,14 @@
+import os
+import random
+
 import numpy as np
 import torch
-import os
-from PIL import Image
+from PIL import Image, ImageFilter
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
-from tqdm import tqdm
 from torchvision.transforms import v2
+from tqdm import tqdm
+
 
 class GaussianBlur(object):
     """Gaussian blur augmentation in SimCLR https://arxiv.org/abs/2002.05709"""
@@ -126,6 +129,54 @@ def get_dataloader(args, domain, is_preread = True):
     args.all_dataset_size = len(train_dataset)
     return dataset_dirt
 
+
+class dataset_nrc(Dataset):
+    def __init__(self, image_list, image_base, isTrian = True):
+        self.imgs = make_dataset(image_list)
+        self.imgs_raw = []
+        self.imgs_test = []
+        self.images_size = len(self.imgs)
+        self.isTrian = isTrian
+        self.get_transform()
+        for index in tqdm(range(self.images_size),desc=f"read dataset"):
+            item = self.imgs[index]
+            imgs_path, _ = item
+            imgs = RGB_loader(os.path.join(image_base,imgs_path))
+            self.imgs_raw.append(imgs)
+            if not isTrian:
+                # 预读images test数据
+                self.imgs_test.append(self.test_transform(imgs))
+
+    def __getitem__(self, index):
+        _, imgs_label = self.imgs[index]
+        if self.isTrian:
+            img = self.train_transform(self.imgs_raw[index])
+        else:
+            img = self.imgs_test[index]
+        return {
+            "img":img,
+            "label":imgs_label,
+            "index": index,
+            }
+
+    def __len__(self):
+        return len(self.imgs)
+
+    def get_transform(self):
+        self.train_transform = transforms.Compose([
+            transforms.Resize((256, 256)),
+            transforms.RandomCrop(224),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])]
+            )
+        
+        self.test_transform = transforms.Compose([
+            transforms.Resize((256, 256)),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])]
+            )
 
 class dataset_shot(Dataset):
     def __init__(self, image_list, image_base, isTrian = True):
@@ -294,6 +345,9 @@ class dataset_guidingPseudoSFDA(Dataset):
             )
                   
 
+
+
+
 def get_dataloader_select(args, domain):
     txt_path = os.path.join(args.dataset_path, f"{domain}.txt")
     image_path = os.path.join(args.image_root, domain)
@@ -317,6 +371,11 @@ def get_dataloader_select(args, domain):
 
     elif args.method == 'shot':
         # for shot domain adaptation, train and test use all dataset, no split!
+        dataset_read = dataset_shot
+        train_list, test_list = dataset_txt, dataset_txt
+
+    elif args.method == 'nrc':
+        # the nrc dataloader is the same as the SHOT
         dataset_read = dataset_shot
         train_list, test_list = dataset_txt, dataset_txt
         

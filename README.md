@@ -2,7 +2,7 @@
 
 ## Update
 - 20240927: Create SFDA Library Repo
-- 20240928：Upload SHOT, guidingPseudoSFDA, NRC
+- 20240928: Upload SHOT, guidingPseudoSFDA, NRC
 
 ## Introduction
 SFDALib(Source-Free Domain Adaptation Library) is building...
