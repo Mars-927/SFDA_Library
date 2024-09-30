@@ -71,18 +71,18 @@ def div(logits, epsilon=1e-8):
     loss_div = -torch.sum(-probs_mean * torch.log(probs_mean + epsilon))
     return loss_div
 
-def nl_criterion(output, y, num_class):
+def nl_criterion(output, y, class_num):
     output = torch.log( torch.clamp(1.-F.softmax(output, dim=1), min=1e-5, max=1.) )
-    labels_neg = ( (y.unsqueeze(-1).repeat(1, 1) + torch.LongTensor(len(y), 1).random_(1, num_class).cuda()) % num_class ).view(-1)
+    labels_neg = ( (y.unsqueeze(-1).repeat(1, 1) + torch.LongTensor(len(y), 1).random_(1, class_num).cuda()) % class_num ).view(-1)
     l = F.nll_loss(output, labels_neg, reduction='none')
     return l
 
 
 class guidingPseudoSFDA(nn.Module):
-    def __init__(self, num_class):
+    def __init__(self, class_num):
         super(guidingPseudoSFDA, self).__init__()
         self.resnet = Resnet50()
-        self.classifier = Classifier(num_class)
+        self.classifier = Classifier(class_num)
         
     def forward(self, x):
         features = self.resnet(x)

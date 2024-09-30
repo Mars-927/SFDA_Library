@@ -57,15 +57,15 @@ def train(args, epoch, net, moco_model, optimizer, trainloader, banks):
 
         with torch.no_grad():
             #CE weights
-            max_entropy = torch.log2(torch.tensor(args.num_class))
+            max_entropy = torch.log2(torch.tensor(args.class_num))
             w = entropy(probs_w)
             w = w / max_entropy
             w = torch.exp(-w)
 
         if args.neg_l:
-            loss_cls = ( nl_criterion(logits_q, pseudo_labels_w, args.num_class)).mean()
+            loss_cls = ( nl_criterion(logits_q, pseudo_labels_w, args.class_num)).mean()
             if args.reweighting:
-                loss_cls = (w * nl_criterion(logits_q, pseudo_labels_w, args.num_class)).mean()
+                loss_cls = (w * nl_criterion(logits_q, pseudo_labels_w, args.class_num)).mean()
         else:
             loss_cls = ( CE(logits_q, pseudo_labels_w)).mean()
             if args.reweighting:
@@ -105,12 +105,12 @@ def guidingPseudoSFDA_tar(args, dataset_dirt):
     test_loader = dataset_dirt["test"]
 
     # network
-    net = guidingPseudoSFDA(args.num_class)
-    momentum_net = guidingPseudoSFDA(args.num_class)
+    net = guidingPseudoSFDA(args.class_num)
+    momentum_net = guidingPseudoSFDA(args.class_num)
     net.load_weight(args)
     momentum_net.load_weight(args)
     optimizer = optim.SGD(net.parameters(), lr=args.lr, weight_decay=5e-4)
-    moco_model = AdaMoCo(src_model = net, momentum_model = momentum_net, features_length=256, num_classes=args.num_class, dataset_length=len(args.train_dataset_size), temporal_length=args.temporal_length)
+    moco_model = AdaMoCo(src_model = net, momentum_model = momentum_net, features_length=256, num_classes=args.class_num, dataset_length=len(args.train_dataset_size), temporal_length=args.temporal_length)
 
 
     # train

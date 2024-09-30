@@ -29,9 +29,9 @@ class Resnet101(nn.Module):
 
 
 class Classifier(nn.Module):
-    def __init__(self, num_class, feature_dim=256):
+    def __init__(self, class_num, feature_dim=256):
         super(Classifier, self).__init__()
-        self.classifier = torch.nn.utils.parametrizations.weight_norm(nn.Linear(feature_dim, num_class))
+        self.classifier = torch.nn.utils.parametrizations.weight_norm(nn.Linear(feature_dim, class_num))
 
     def forward(self, feature):
         logics = self.classifier(feature)

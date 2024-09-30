@@ -19,10 +19,10 @@ def test_domain(extractor, classifier, test_dataloader):
     return acc
 
 @torch.no_grad()
-def test_target_shot(args, test_dataloader, weight_basepath):
+def test_shot_source(args, test_dataloader, weight_basepath, weight_name):
     feature_net = resnet(args.net).cuda().eval()
     classifier_net = feat_classifier(class_num = args.class_num).cuda().eval()
-    feature_net.load_state_dict(torch.load(os.path.join(weight_basepath, f"resnet_{args.source_domain}.pt")))
-    classifier_net.load_state_dict(torch.load(os.path.join(weight_basepath, f"classifier_{args.source_domain}.pt")))
+    feature_net.load_state_dict(torch.load(os.path.join(weight_basepath, f"resnet_{weight_name}.pt")))
+    classifier_net.load_state_dict(torch.load(os.path.join(weight_basepath, f"classifier_{weight_name}.pt")))
     return test_domain(feature_net, classifier_net, test_dataloader)
 

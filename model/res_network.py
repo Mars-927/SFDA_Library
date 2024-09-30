@@ -67,3 +67,13 @@ class feat_classifier(nn.Module):
     def forward(self, x):
         x = self.fc(x)
         return x
+
+class rot_feat_classifier(nn.Module):
+    def __init__(self, class_num, bottleneck_dim=256):
+        super(rot_feat_classifier, self).__init__()
+        self.fc = nn.Linear(bottleneck_dim, class_num)
+        self.fc.apply(init_weights)
+
+    def forward(self, x):
+        x = self.fc(x)
+        return x

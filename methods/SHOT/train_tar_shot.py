@@ -93,7 +93,8 @@ def train_target(args, dataset_dirt):
             log_str = 'Task: Train {}, Iter:{}/{}; Accuracy = {:.4f}%'.format(args.target_domain, iter_num, max_iter, acc)
             Project.log(log_str)
             feature_net.train()
-            if best > acc:
+            if best < acc:
+                best = acc
                 torch.save(feature_net.state_dict(), os.path.join(args.output_dir_src, f"resnet_{args.source_domain}2{args.target_domain}.pt"))
                 torch.save(classifier_net.state_dict(), os.path.join(args.output_dir_src, f"classifier_{args.source_domain}2{args.target_domain}.pt"))
 

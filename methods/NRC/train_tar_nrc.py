@@ -39,7 +39,7 @@ def train_target(args, dataset_dirt):
     loader = dataset_dirt["train"]
     num_sample=len(loader.dataset)
     fea_bank=torch.randn(num_sample,args.feature_dim)
-    score_bank = torch.randn(num_sample, args.num_class).cuda()
+    score_bank = torch.randn(num_sample, args.class_num).cuda()
 
     # init feature bank and score bank
     feature_net.eval()
@@ -56,7 +56,7 @@ def train_target(args, dataset_dirt):
             outputs=nn.Softmax(-1)(outputs)
             fea_bank[indx] = output_norm.detach().clone().cpu()
             score_bank[indx] = outputs.detach().clone()
-    max_iter = args.max_epoch * len(dataset_dirt["target"])
+    max_iter = args.max_epoch * len(dataset_dirt["train"])
     interval_iter = max_iter // args.interval
     iter_num = 0
     best = 0
@@ -116,7 +116,7 @@ def train_target(args, dataset_dirt):
 
             score_near_kk = score_bank[idx_near_near]  # batch x K x M x C
             weight_kk = weight_kk.contiguous().view(weight_kk.shape[0],-1)  # batch x KM
-            score_near_kk = score_near_kk.contiguous().view(score_near_kk.shape[0], -1,args.num_class)  # batch x KM x C
+            score_near_kk = score_near_kk.contiguous().view(score_near_kk.shape[0], -1,args.class_num)  # batch x KM x C
             score_self = score_bank[tar_idx]
 
 
@@ -150,10 +150,10 @@ def train_target(args, dataset_dirt):
             log_str = 'Task: Train {}, Iter:{}/{}; Accuracy = {:.4f}%'.format(args.target_domain, iter_num, max_iter, acc)
             Project.log(log_str)
             feature_net.train()
-            if best > acc:
+            if best < acc:
+                best = acc
                 torch.save(feature_net.state_dict(), os.path.join(args.output_dir_src, f"resnet_{args.source_domain}2{args.target_domain}.pt"))
                 torch.save(classifier_net.state_dict(), os.path.join(args.output_dir_src, f"classifier_{args.source_domain}2{args.target_domain}.pt"))
-    
 
 
 def nrc_tar(args, dataset_dirt):
