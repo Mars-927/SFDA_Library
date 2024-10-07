@@ -161,13 +161,13 @@ def nrc_tar(args, dataset_dirt):
     args.interval = 15
     args.lr = 1e-3
     args.net = "resnet50"
-    args.K = 4
-    args.KK = 3
+    args.K = 3
+    args.KK = 2
     args.epsilon = 1e-5
-    args.cls_par = 0.3
-    args.ent_par = 1.0
-    args.lr_decay1 = 0.1
-    args.lr_decay2 = 1.0
+
+
+
+
     args.feature_dim = 256
 
     args.output_dir_src = Project.root_path

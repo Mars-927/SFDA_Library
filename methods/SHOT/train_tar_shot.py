@@ -100,6 +100,10 @@ def train_target(args, dataset_dirt):
 
 
 def shot_tar(args, dataset_dirt):
+    # base office31
+    # ~/anaconda3/envs/pytorch/bin/python image_source.py --trte val --output ckps/source/ --da uda --gpu_id 0 --dset office --max_epoch 100 --s 0
+    # ~/anaconda3/envs/pytorch/bin/python image_target.py --cls_par 0.3 --da uda --dset office --gpu_id 0 --s 0 --output_src ckps/source/ --output ckps/target/
+    
     args.max_epoch = 15
     args.interval = 15
     args.lr = 1e-2

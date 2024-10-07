@@ -21,8 +21,9 @@ class Project():
             info_folder_path = os.path.join(process_folder_path,project_name)
 
         if os.path.exists(info_folder_path):
-            input("\nexise log folder, press everything to clear it...")
-            shutil.rmtree(info_folder_path)
+            check = input("\nexise log folder, press everything to clear it...")
+            if check != "no":
+                shutil.rmtree(info_folder_path)
         self.__create_folder(info_folder_path)
 
 

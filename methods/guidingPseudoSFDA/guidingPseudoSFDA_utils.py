@@ -4,7 +4,8 @@ from torch.optim.lr_scheduler import *
 import torch
 import torch.nn as nn
 import os
-from model.Resnet import Resnet50,Classifier
+
+from model.res_network import feat_classifier, resnet
 from sklearn.metrics import accuracy_score
 
 def entropy(p, axis=1):
@@ -81,8 +82,8 @@ def nl_criterion(output, y, class_num):
 class guidingPseudoSFDA(nn.Module):
     def __init__(self, class_num):
         super(guidingPseudoSFDA, self).__init__()
-        self.resnet = Resnet50()
-        self.classifier = Classifier(class_num)
+        self.resnet = resnet()
+        self.classifier = feat_classifier(class_num)
         
     def forward(self, x):
         features = self.resnet(x)
@@ -108,8 +109,8 @@ def eval_and_label_dataset(model, test_loader, num_neighbors):
     features = []
     for _, batch in enumerate(test_loader):
 
-        inputs = batch["weak_augmented"].cuda()
-        targets = batch["imgs_label"].cuda()
+        inputs = batch["img"].cuda()
+        targets = batch["label"].cuda()
         idxs = batch["index"].cuda()
 
         feats, logits_cls = model(inputs, cls_only=True)

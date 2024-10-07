@@ -92,25 +92,26 @@ def guidingPseudoSFDA_tar(args, dataset_dirt):
     args.num_neighbors = 10
     args.temporal_length =5
     args.lr = 0.02
-    args.num_epochs = 300
+    args.num_epochs = 75
     args.temperature = 0.07
     args.ctr = True
     args.label_refinement = True
     args.neg_l = True
     args.reweighting = True
-
+    args.net = "resnet50"
+    args.output_dir_src = Project.root_path
 
     # dataset
     train_loader = dataset_dirt["train"]
     test_loader = dataset_dirt["test"]
 
     # network
-    net = guidingPseudoSFDA(args.class_num)
-    momentum_net = guidingPseudoSFDA(args.class_num)
+    net = guidingPseudoSFDA(args.class_num).cuda()
+    momentum_net = guidingPseudoSFDA(args.class_num).cuda()
     net.load_weight(args)
     momentum_net.load_weight(args)
     optimizer = optim.SGD(net.parameters(), lr=args.lr, weight_decay=5e-4)
-    moco_model = AdaMoCo(src_model = net, momentum_model = momentum_net, features_length=256, num_classes=args.class_num, dataset_length=len(args.train_dataset_size), temporal_length=args.temporal_length)
+    moco_model = AdaMoCo(src_model = net, momentum_model = momentum_net, features_length=256, num_classes=args.class_num, dataset_length=len(train_loader.dataset), temporal_length=args.temporal_length).cuda()
 
 
     # train
@@ -121,5 +122,7 @@ def guidingPseudoSFDA_tar(args, dataset_dirt):
         train(args, epoch, net, moco_model, optimizer, train_loader, banks)      # train net1 
         acc, banks, _, _ = eval_and_label_dataset(moco_model, test_loader, args.num_neighbors)
         if acc > best:
-            save_weights(net, epoch, Project.get_folder("root") + '/weights_best.tar')
+
             best = acc
+            torch.save(net.resnet.state_dict(), os.path.join(args.output_dir_src, f"resnet_{args.source_domain}2{args.target_domain}.pt"))
+            torch.save(net.classifier.state_dict(), os.path.join(args.output_dir_src, f"classifier_{args.source_domain}2{args.target_domain}.pt"))

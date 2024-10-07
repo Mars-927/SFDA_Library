@@ -56,7 +56,8 @@ def train_target_decay(args, dataset_dirt):
 
     netF.train()
     oldC.train()
-
+    best = 0
+    
     while iter_num < max_iter:
         if iter_num > 0.5 * max_iter:
             args.K = 2
@@ -145,7 +146,8 @@ def AaD_tar(args, dataset_dirt):
     args.max_epoch = 40
     args.interval = 15
     args.lr = 1e-3
-    args.bottleneck = 256
+    args.bottleneck_dim = 256
+    args.net = 'resnet50'
     args.k = 2
     args.K = 4
     args.KK = 3

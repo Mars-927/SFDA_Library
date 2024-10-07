@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 from torchvision.transforms import v2
 from tqdm import tqdm
-
+import torchvision.io as tvi
 
 class GaussianBlur(object):
     """Gaussian blur augmentation in SimCLR https://arxiv.org/abs/2002.05709"""
@@ -37,69 +37,65 @@ def RGB_loader(path):
         with Image.open(f) as img:
             return img.convert('RGB')
 
-class dataset_read(Dataset):
-    def __init__(self, image_list, image_base, is_preread = True, only_clear = True):
+class dataset_SFDA(Dataset):
+    def __init__(self, image_list, image_base, isTrian = True):
         self.imgs = make_dataset(image_list)
-        self.is_preread = is_preread
+        self.imgs_raw = []
+        self.imgs_test = []
+        self.images_size = len(self.imgs)
+        self.isTrian = isTrian
         self.define_transform()
-
-        if is_preread:
-            self.pre_read = []
-            images_size = len(self.imgs)
-            for index in tqdm(range(images_size),desc=f"read dataset"):
-                item = self.imgs[index]
-                imgs_path, imgs_label = item
-                imgs = RGB_loader(os.path.join(image_base,imgs_path))
-                if only_clear:
-                    self.pre_read.append({
-                        "img":self.clear_transform(imgs),
-                        "label":imgs_label,
-                        "path":imgs_path,
-                        "index":index
-                    })
-                else:
-                    self.pre_read.append({
-                        "img":self.clear_transform(imgs),
-                        "weak_img":self.weak_transform(imgs),
-                        "strong_img":self.strong_transform(imgs),
-                        "label":imgs_label,
-                        "path":imgs_path,
-                        "index":index
-                    })
-
-        else:
-            self.image_base = image_base
-
-    def __getitem__(self, index):
-        if self.is_preread:
-            return self.pre_read[index]
-        else:
-            imgs_path, imgs_label = self.imgs[index]
-            imgs = RGB_loader(os.path.join(self.image_base,imgs_path))
-            return {
-                    "img":self.transform(imgs),
+        for index in tqdm(range(self.images_size),desc=f"read dataset"):
+            item = self.imgs[index]
+            imgs_path, imgs_label = item
+            img = RGB_loader(os.path.join(image_base,imgs_path))
+            if not isTrian:
+                self.imgs_test.append({
+                    "img":self.test_transform(img),
                     "label":imgs_label,
                     "path":imgs_path,
                     "index":index
-                }
-    
+                })
+            else:
+                self.imgs_raw.append({
+                    "img":self.clear_transform(img),
+                    "train_cls_transformcon":self.train_cls_transformcon(img),
+                    "train_transforms_1":self.train_transforms(img),
+                    "train_transforms_2":self.train_transforms(img),
+                    "label":imgs_label,
+                    "path":imgs_path,
+                    "index":index
+                })
+
+    def __getitem__(self, index):
+        if not self.isTrian:
+            return self.imgs_test[index]
+        else:
+            return self.imgs_raw[index]
+
     def __len__(self):
         return len(self.imgs)
 
     def define_transform(self):
-        self.strong_transform = transforms.Compose([
-            transforms.Resize([224,224]),
-            transforms.RandomHorizontalFlip(p=0.5),
-            transforms.RandomVerticalFlip(p=0.5),
-            v2.RandAugment(),
-            transforms.ToTensor(), 
-            transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225]),
-        ])
-        self.weak_transform = transforms.Compose([
-            transforms.Resize((256, 256)),
-            transforms.RandomCrop(224),
+        self.train_transforms = transforms.Compose([
+            transforms.RandomResizedCrop(224, scale=(0.2, 1.)),
             transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(), 
+            transforms.RandomApply([
+                transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+            ], p=0.8),
+            transforms.RandomGrayscale(p=0.2),
+            transforms.ToTensor(),
+            transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])
+        ])
+        self.train_cls_transformcon = transforms.Compose([
+            transforms.RandomResizedCrop(224),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])
+            ])
+        self.test_transform = transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
             transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])
             ])
         self.clear_transform = transforms.Compose([
@@ -108,75 +104,6 @@ class dataset_read(Dataset):
             transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])
         ])
 
-def get_dataloader(args, domain, is_preread = True):
-    txt_path = os.path.join(args.dataset_path,f"{domain}.txt")
-    image_path = os.path.join(args.image_root,domain)
-    dataset_dirt = {}
-    dataset_txt = open(txt_path).readlines()
-    dataset_size = len(dataset_txt)
-    train_size = int(dataset_size * 0.8)
-    test_size = dataset_size - train_size
-    train_list, test_list = torch.utils.data.random_split(dataset_txt, [train_size, test_size])
-
-    train_dataset = dataset_read(train_list, image_base=image_path, is_preread=is_preread,only_clear=False)
-    test_dataset = dataset_read(test_list, image_base=image_path, is_preread=is_preread)
-    all_dataset = dataset_read(dataset_txt, image_base=image_path, is_preread=is_preread)
-    dataset_dirt["train"] = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, drop_last=False, pin_memory=True)
-    dataset_dirt["test"] = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=True, drop_last=False, pin_memory=True)
-    dataset_dirt["all"] = DataLoader(all_dataset, batch_size=args.batch_size, shuffle=True, drop_last=False, pin_memory=True)
-    args.train_dataset_size = len(train_dataset)
-    args.test_dataset_size = len(test_dataset)
-    args.all_dataset_size = len(train_dataset)
-    return dataset_dirt
-
-
-# class dataset_nrc(Dataset):
-#     def __init__(self, image_list, image_base, isTrian = True):
-#         self.imgs = make_dataset(image_list)
-#         self.imgs_raw = []
-#         self.imgs_test = []
-#         self.images_size = len(self.imgs)
-#         self.isTrian = isTrian
-#         self.get_transform()
-#         for index in tqdm(range(self.images_size),desc=f"read dataset"):
-#             item = self.imgs[index]
-#             imgs_path, _ = item
-#             imgs = RGB_loader(os.path.join(image_base,imgs_path))
-#             self.imgs_raw.append(imgs)
-#             if not isTrian:
-#                 # 预读images test数据
-#                 self.imgs_test.append(self.test_transform(imgs))
-
-#     def __getitem__(self, index):
-#         _, imgs_label = self.imgs[index]
-#         if self.isTrian:
-#             img = self.train_transform(self.imgs_raw[index])
-#         else:
-#             img = self.imgs_test[index]
-#         return {
-#             "img":img,
-#             "label":imgs_label,
-#             "index": index,
-#             }
-
-#     def __len__(self):
-#         return len(self.imgs)
-
-#     def get_transform(self):
-#         self.train_transform = transforms.Compose([
-#             transforms.Resize((256, 256)),
-#             transforms.RandomCrop(224),
-#             transforms.RandomHorizontalFlip(),
-#             transforms.ToTensor(),
-#             transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])]
-#             )
-        
-#         self.test_transform = transforms.Compose([
-#             transforms.Resize((256, 256)),
-#             transforms.CenterCrop(224),
-#             transforms.ToTensor(),
-#             transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])]
-#             )
 
 class dataset_shot(Dataset):
     def __init__(self, image_list, image_base, isTrian = True):
@@ -226,52 +153,6 @@ class dataset_shot(Dataset):
             transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])]
             )
 
-# class dataset_shotSource(Dataset):
-#     def __init__(self, image_list, image_base, isTrian = True):
-#         self.imgs = make_dataset(image_list)
-#         self.imgs_raw = []
-#         self.imgs_test = []
-#         self.images_size = len(self.imgs)
-#         self.isTrian = isTrian
-#         self.get_transform()
-#         for index in tqdm(range(self.images_size),desc=f"read dataset"):
-#             item = self.imgs[index]
-#             imgs_path, _ = item
-#             imgs = RGB_loader(os.path.join(image_base,imgs_path))
-#             self.imgs_raw.append(imgs)
-#             if not isTrian:
-#                 # 预读images test数据
-#                 self.imgs_test.append(self.test_transform(imgs))
-
-#     def __getitem__(self, index):
-#         _, imgs_label = self.imgs[index]
-#         if self.isTrian:
-#             img = self.train_transform(self.imgs_raw[index])
-#         else:
-#             img = self.imgs_test[index]
-#         return {
-#             "img":img,
-#             "label":imgs_label,
-#             }
-
-#     def __len__(self):
-#         return len(self.imgs)
-
-#     def get_transform(self):
-#         self.train_transform = transforms.Compose([
-#             transforms.Resize((256, 256)),
-#             transforms.RandomCrop(224),
-#             transforms.RandomHorizontalFlip(),
-#             transforms.ToTensor(),
-#             transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])]
-#             )
-        
-#         self.test_transform = transforms.Compose([
-#             transforms.Resize((256, 256)),
-#             transforms.CenterCrop(224),
-#             transforms.ToTensor(),
-#             transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])]
-#             )
 
 class dataset_guidingPseudoSFDA(Dataset):
     def __init__(self, image_list, image_base,isTrian = True):
@@ -286,13 +167,13 @@ class dataset_guidingPseudoSFDA(Dataset):
             imgs_path, _ = item
             imgs = RGB_loader(os.path.join(image_base,imgs_path))
             self.imgs_raw.append(imgs)
-        if not isTrian:
-            self.imgs_test.append(self.test_transform(imgs))
+            if not isTrian:
+                self.imgs_test.append(self.test_transform(imgs))
 
     def __getitem__(self, index):
         _, imgs_label = self.imgs[index]
         if self.isTrian:
-            imgs = self.imgs_test[index]
+            imgs = self.imgs_raw[index]
             weak_augmented = self.train_weak_transform(imgs)
             strong_augmented = self.strong_transform(imgs)
             strong_augmented2 = self.strong_transform(imgs)
@@ -372,6 +253,10 @@ def get_dataloader_select(args, domain):
         dataset_read = dataset_shot
         train_list, test_list = dataset_txt, dataset_txt
 
+    elif args.method == 'SFDA':
+        dataset_read = dataset_SFDA
+        train_list, test_list = dataset_txt, dataset_txt
+
 
         
 
@@ -387,3 +272,256 @@ def get_dataloader_select(args, domain):
     args.train_dataset_size = len(train_dataset)
 
     return dataset_dirt
+
+
+
+
+
+
+
+
+
+# class dataset_shotSource(Dataset):
+#     def __init__(self, image_list, image_base, isTrian = True):
+#         self.imgs = make_dataset(image_list)
+#         self.imgs_raw = []
+#         self.imgs_test = []
+#         self.images_size = len(self.imgs)
+#         self.isTrian = isTrian
+#         self.get_transform()
+#         for index in tqdm(range(self.images_size),desc=f"read dataset"):
+#             item = self.imgs[index]
+#             imgs_path, _ = item
+#             imgs = RGB_loader(os.path.join(image_base,imgs_path))
+#             self.imgs_raw.append(imgs)
+#             if not isTrian:
+#                 # 预读images test数据
+#                 self.imgs_test.append(self.test_transform(imgs))
+
+#     def __getitem__(self, index):
+#         _, imgs_label = self.imgs[index]
+#         if self.isTrian:
+#             img = self.train_transform(self.imgs_raw[index])
+#         else:
+#             img = self.imgs_test[index]
+#         return {
+#             "img":img,
+#             "label":imgs_label,
+#             }
+
+#     def __len__(self):
+#         return len(self.imgs)
+
+#     def get_transform(self):
+#         self.train_transform = transforms.Compose([
+#             transforms.Resize((256, 256)),
+#             transforms.RandomCrop(224),
+#             transforms.RandomHorizontalFlip(),
+#             transforms.ToTensor(),
+#             transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])]
+#             )
+        
+#         self.test_transform = transforms.Compose([
+#             transforms.Resize((256, 256)),
+#             transforms.CenterCrop(224),
+#             transforms.ToTensor(),
+#             transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])]
+#             )
+
+
+
+# class dataset_nrc(Dataset):
+#     def __init__(self, image_list, image_base, isTrian = True):
+#         self.imgs = make_dataset(image_list)
+#         self.imgs_raw = []
+#         self.imgs_test = []
+#         self.images_size = len(self.imgs)
+#         self.isTrian = isTrian
+#         self.get_transform()
+#         for index in tqdm(range(self.images_size),desc=f"read dataset"):
+#             item = self.imgs[index]
+#             imgs_path, _ = item
+#             imgs = RGB_loader(os.path.join(image_base,imgs_path))
+#             self.imgs_raw.append(imgs)
+#             if not isTrian:
+#                 # 预读images test数据
+#                 self.imgs_test.append(self.test_transform(imgs))
+
+#     def __getitem__(self, index):
+#         _, imgs_label = self.imgs[index]
+#         if self.isTrian:
+#             img = self.train_transform(self.imgs_raw[index])
+#         else:
+#             img = self.imgs_test[index]
+#         return {
+#             "img":img,
+#             "label":imgs_label,
+#             "index": index,
+#             }
+
+#     def __len__(self):
+#         return len(self.imgs)
+
+#     def get_transform(self):
+#         self.train_transform = transforms.Compose([
+#             transforms.Resize((256, 256)),
+#             transforms.RandomCrop(224),
+#             transforms.RandomHorizontalFlip(),
+#             transforms.ToTensor(),
+#             transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])]
+#             )
+        
+#         self.test_transform = transforms.Compose([
+#             transforms.Resize((256, 256)),
+#             transforms.CenterCrop(224),
+#             transforms.ToTensor(),
+#             transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])]
+#             )
+
+
+# class dataset_SFDA(Dataset):
+#     def __init__(self, image_list, image_base, isTrian = True):
+#         self.imgs = make_dataset(image_list)
+#         self.imgs_raw = []
+#         self.imgs_test = []
+#         self.images_size = len(self.imgs)
+#         self.isTrian = isTrian
+#         self.define_transform()
+#         for index in tqdm(range(self.images_size),desc=f"read dataset"):
+#             item = self.imgs[index]
+#             imgs_path, imgs_label = item
+#             img = RGB_loader(os.path.join(image_base,imgs_path))
+#             if not isTrian:
+#                 self.imgs_test.append({
+#                     "img":self.test_transform(img),
+#                     "label":imgs_label,
+#                     "path":imgs_path,
+#                     "index":index
+#                 })
+#             else:
+#                 self.imgs_raw.append({
+#                     "img":self.clear_transform(img),
+#                     "train_cls_transformcon":self.train_cls_transformcon(img),
+#                     "train_transforms_1":self.train_transforms(img),
+#                     "train_transforms_2":self.train_transforms(img),
+#                     "label":imgs_label,
+#                     "path":imgs_path,
+#                     "index":index
+#                 })
+
+#     def __getitem__(self, index):
+#         if not self.isTrian:
+#             return self.imgs_test[index]
+#         else:
+#             return self.imgs_raw[index]
+
+#     def __len__(self):
+#         return len(self.imgs)
+
+#     def define_transform(self):
+#         self.train_transforms = transforms.Compose([
+#             transforms.RandomResizedCrop(224, scale=(0.2, 1.)),
+#             transforms.RandomHorizontalFlip(),
+#             transforms.RandomApply([
+#                 transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+#             ], p=0.8),
+#             transforms.RandomGrayscale(p=0.2),
+#             transforms.ToTensor(),
+#             transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])
+#         ])
+#         self.train_cls_transformcon = transforms.Compose([
+#             transforms.RandomResizedCrop(224),
+#             transforms.RandomHorizontalFlip(),
+#             transforms.ToTensor(),
+#             transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])
+#             ])
+#         self.test_transform = transforms.Compose([
+#             transforms.Resize((224, 224)),
+#             transforms.ToTensor(),
+#             transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])
+#             ])
+#         self.clear_transform = transforms.Compose([
+#             transforms.Resize((224, 224)),
+#             transforms.ToTensor(), 
+#             transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])
+#         ])
+
+
+
+# class dataset_SFDA(Dataset):
+#     def __init__(self, image_list, image_base, isTrian = True):
+#         self.imgs = make_dataset(image_list)
+#         self.imgs_raw = []
+#         self.imgs_test = []
+#         self.images_size = len(self.imgs)
+#         self.isTrian = isTrian
+#         self.define_transform()
+#         for index in tqdm(range(self.images_size),desc=f"read dataset"):
+#             item = self.imgs[index]
+#             imgs_path, _ = item
+#             # imgs = RGB_loader(os.path.join(image_base,imgs_path))
+#             imgs = tvi.read_image(os.path.join(image_base,imgs_path), tvi.ImageReadMode.RGB).cuda()
+#             self.imgs_raw.append(imgs)
+#             if not isTrian:
+#                 self.imgs_test.append(self.test_transform(imgs))
+
+#     def __getitem__(self, index):
+#         imgs_path, imgs_label = self.imgs[index]
+#         if self.isTrian:
+#             img = self.imgs_raw[index]
+#             return {
+#                     "img":self.clear_transform(img),
+#                     "train_cls_transformcon":self.train_cls_transformcon(img),
+#                     "train_transforms_1":self.train_transforms(img),
+#                     "train_transforms_2":self.train_transforms(img),
+#                     "label":imgs_label,
+#                     "path":imgs_path,
+#                     "index":index
+#                 }
+#         else:
+#             return {
+#                     "img":self.imgs_test[index],
+#                     "label":imgs_label,
+#                     "path":imgs_path,
+#                     "index":index
+#                 }
+
+#     def __len__(self):
+#         return len(self.imgs)
+
+#     def define_transform(self):
+#         self.train_transforms = transforms.Compose([
+#             transforms.RandomResizedCrop(224, scale=(0.2, 1.)),
+#             transforms.RandomHorizontalFlip(),
+#             transforms.RandomApply([
+#                 transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+#             ], p=0.8),
+#             transforms.RandomGrayscale(p=0.2),
+#             zeroOneNormalize(),
+#             # transforms.ToTensor(),
+#             transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])
+#         ])
+#         self.train_cls_transformcon = transforms.Compose([
+#             transforms.RandomResizedCrop(224),
+#             transforms.RandomHorizontalFlip(),
+#             zeroOneNormalize(),
+#             # transforms.ToTensor(),
+#             transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])
+#             ])
+#         self.test_transform = transforms.Compose([
+#             transforms.Resize((224, 224), antialias=True),
+#             zeroOneNormalize(),
+#             # transforms.ToTensor(),
+#             transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])
+#             ])
+#         self.clear_transform = transforms.Compose([
+#             transforms.Resize((224, 224), antialias=True),
+#             zeroOneNormalize(),
+#             # transforms.ToTensor(), 
+#             transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])
+#         ])
+
+# class zeroOneNormalize(object):
+#     # 加速读取使用
+#     def __call__(self, img):
+#         return img.float().div(255)

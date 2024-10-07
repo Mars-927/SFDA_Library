@@ -6,6 +6,7 @@ from methods.SHOT.train_src_shot import shot_src
 from methods.SHOT.train_tar_shot import shot_tar
 from methods.NRC.train_tar_nrc import nrc_tar
 from methods.AaD.train_tar_AaD import AaD_tar
+from methods.SFDA.train_tar_sfda import SFDA_tar
 from utils.Dataset import get_dataloader_select
 from utils.Evaluate import test_shot_source
 from utils.Other import seed_everything
@@ -13,41 +14,40 @@ from utils.Project_Record import Project
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='PyTorch Training')
-    parser.add_argument('--name', type=str, default="nrc_test")  # create folder name
-    parser.add_argument('--pretrain', type=str, default="source test")  # read folde name
-    parser.add_argument('--dataset', type=str, default="OFFICE31",  choices = ["AID_NWPU_UCM","OFFICE31"])
-    parser.add_argument('--method', type=str, default="nrc")
-    parser.add_argument('--gpu_id', type=str, default='1')
-    parser.add_argument('--batch_size', type=int, default=64)
+    parser.add_argument('--name', type=str, default="SFDA_AID_NWPU_UCM_Target")                                               # create folder name
+    parser.add_argument('--pretrain', type=str, default="SHOT_AID_NWPU_UCM_Source")                                           # pretrain model folder name
+    parser.add_argument('--mode', type=str, default="Target", choices=["Source","Target"])             # Pretrain or domain domain
+    parser.add_argument('--dataset', type=str, default="AID_NWPU_UCM", choices = ["AID_NWPU_UCM","OFFICE31"])       # AID_NWPU_UCM Base office31
+    parser.add_argument('--method', type=str, default="SFDA")
+    parser.add_argument('--gpu_id', type=str, default='0')
+    parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--seed', type=int, default=0)
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
     seed_everything(args.seed)
     Project(args.name)
-    
-    
-    
+
+    # check
     methods = {
         'source_shot': shot_src,
-        'source_shotplus': None,
-        'shot': shot_tar,
-        'nrc': nrc_tar,
-        'shotplus': None,
-        'AaD': AaD_tar,
-        'CSFDA': None,
-        'guidingPseudoSFDA':None,
+        'shot': shot_tar,                               # 2020
+        'nrc': nrc_tar,                                 # 2021
+        'gsfda':None,                                   # 2021
+        'AaD': AaD_tar,                                 # 2022
+        'CSFDA': None,                                  # 2023
+        'guidingPseudoSFDA': guidingPseudoSFDA_tar,     # 2023
+        'SFDA':SFDA_tar,
     }
     evals = {
         'source_shot': test_shot_source,
-        'source_shotplus': test_shot_source,
         'shot': test_shot_source,
         'nrc': test_shot_source,
-        'shotplus': test_shot_source,
+        'gsfda':None,
         'AaD': test_shot_source,
         'CSFDA': None,
-        'guidingPseudoSFDA':None,
+        'guidingPseudoSFDA': test_shot_source,
+        'SFDA':test_shot_source,
     }
-
 
     if args.dataset == "AID_NWPU_UCM":
         args.class_num = 10
@@ -60,20 +60,14 @@ if __name__ == "__main__":
         args.dataset_path = "dataset/OFFICE31"
         args.image_root = "F:/HANS/!dataset/OFFICE31"
         args.domains = ["amazon", "dslr", "webcam"]
-
-    elif args.dataset == "office_home":
-        args.class_num = 65
-        args.dataset_path = "dataset/OfficeHomeDataset"
-        args.image_root = "F:/HANS/!dataset/OfficeHomeDataset"
-        args.domains = ["Art", "Clipart", "Product", "Real World"]
     else:
         assert False,"unknown dataset"
     assert args.method in methods.keys(), "unknown method"
 
+
     method = args.method
     transfer_method = methods[method]
-    eval_method = evals[method]
-    
+    eval_method = evals[method]    
 
     # pretrain source
     if "source" in method:
@@ -114,3 +108,5 @@ if __name__ == "__main__":
                 log_str = f"Test Target; Method:{method} Dataset:{args.dataset}; {source_domain} => {target_domain}; acc: {acc:.4f}\n\n\n"
                 Project.log(log_str, "score.txt")
 
+# python .\main.py --name guidingPseudoSFDA_AID_NWPU_UCM_Target --pretrain SHOT_AID_NWPU_UCM_Source --dataset AID_NWPU_UCM --gpu_id 1 --method guidingPseudoSFDA
+# python .\main.py --name SFDA_AID_NWPU_UCM_Target --pretrain SHOT_AID_NWPU_UCM_Source --dataset AID_NWPU_UCM --gpu_id 1 --method SFDA
