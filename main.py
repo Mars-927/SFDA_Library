@@ -7,18 +7,19 @@ from methods.SHOT.train_tar_shot import shot_tar
 from methods.NRC.train_tar_nrc import nrc_tar
 from methods.AaD.train_tar_AaD import AaD_tar
 from methods.SFDA.train_tar_sfda import SFDA_tar
+from methods.GSFDA.train_src_gsfda import gsfda_src
 from utils.Dataset import get_dataloader_select
-from utils.Evaluate import test_shot_source
+from utils.Evaluate import test_shot_source, test_gsfda_source
 from utils.Other import seed_everything
 from utils.Project_Record import Project
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='PyTorch Training')
-    parser.add_argument('--name', type=str, default="SFDA_AID_NWPU_UCM_Target")                                               # create folder name
-    parser.add_argument('--pretrain', type=str, default="SHOT_AID_NWPU_UCM_Source")                                           # pretrain model folder name
-    parser.add_argument('--mode', type=str, default="Target", choices=["Source","Target"])             # Pretrain or domain domain
+    parser.add_argument('--name', type=str, default="GSFDA_AID_NWPU_UCM_Target")                                               # create folder name
+    parser.add_argument('--pretrain', type=str, default="GSFDA_AID_NWPU_UCM_Source")                                           # pretrain model folder name
+    parser.add_argument('--mode', type=str, default="Source", choices=["Source","Target"])             # Pretrain or domain domain
     parser.add_argument('--dataset', type=str, default="AID_NWPU_UCM", choices = ["AID_NWPU_UCM","OFFICE31"])       # AID_NWPU_UCM Base office31
-    parser.add_argument('--method', type=str, default="SFDA")
+    parser.add_argument('--method', type=str, default="gsfda")
     parser.add_argument('--gpu_id', type=str, default='0')
     parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--seed', type=int, default=0)
@@ -32,7 +33,7 @@ if __name__ == "__main__":
         'source_shot': shot_src,
         'shot': shot_tar,                               # 2020
         'nrc': nrc_tar,                                 # 2021
-        'gsfda':None,                                   # 2021
+        'gsfda':gsfda_src,                              # 2021
         'AaD': AaD_tar,                                 # 2022
         'CSFDA': None,                                  # 2023
         'guidingPseudoSFDA': guidingPseudoSFDA_tar,     # 2023
@@ -42,7 +43,7 @@ if __name__ == "__main__":
         'source_shot': test_shot_source,
         'shot': test_shot_source,
         'nrc': test_shot_source,
-        'gsfda':None,
+        'gsfda':test_gsfda_source,
         'AaD': test_shot_source,
         'CSFDA': None,
         'guidingPseudoSFDA': test_shot_source,
@@ -70,7 +71,7 @@ if __name__ == "__main__":
     eval_method = evals[method]    
 
     # pretrain source
-    if "source" in method:
+    if args.mode == "Source":
         for source_domain in args.domains:
             args.source_domain = source_domain
             log_str = f"Train Source; Dataset:{args.dataset}; Domain {source_domain};\n"

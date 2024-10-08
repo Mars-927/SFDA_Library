@@ -248,7 +248,7 @@ def get_dataloader_select(args, domain):
         test_size = dataset_size - train_size
         train_list, test_list = torch.utils.data.random_split(dataset_txt, [train_size, test_size])
 
-    elif args.method in ['shot','nrc','shotplus','AaD']:
+    elif args.method in ['shot','nrc','shotplus','AaD','gsfda']:
         # for shot domain adaptation, train and test use all dataset, no split!
         dataset_read = dataset_shot
         train_list, test_list = dataset_txt, dataset_txt

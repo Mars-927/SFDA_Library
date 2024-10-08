@@ -126,6 +126,8 @@ def target_transfer(args, target_dataloader):
 
         if acc_best < teacher_Acc:
             acc_best = teacher_Acc
+            torch.save(resnet_teacher.state_dict(), os.path.join(args.output_dir_src, f"resnet_{args.source_domain}2{args.target_domain}.pt"))
+            torch.save(classifier_teacher.state_dict(), os.path.join(args.output_dir_src, f"classifier_{args.source_domain}2{args.target_domain}.pt"))
         log_str = f"[Train {args.dataset} {args.source_domain}->{args.target_domain}] Epoch {now_epoch:>3}/{args.epoch:>3} teacher resnet: {teacher_Acc:.4f} Acc Best:{acc_best:.4f}"
         Project.log(log_str)
 
@@ -140,10 +142,8 @@ def SFDA_tar(args, dataset_dirt):
     args.topk = 10
     args.EMA = 0.9
     args.fluc_weight = 1
+    args.net = 'resnet50'
+    args.output_dir_src = Project.root_path
     target_transfer(args, dataset_dirt)
-
-
-
-
 
 

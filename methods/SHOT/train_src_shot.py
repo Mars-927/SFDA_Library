@@ -8,6 +8,8 @@ from methods.SHOT.shot_utils import *
 from model.res_network import feat_classifier, resnet
 from utils.Evaluate import test_domain
 from utils.Project_Record import Project
+
+
 def train_source(args, dataset_dirt):
     feature_net = resnet(args.net).cuda()
     classifier_net = feat_classifier(class_num = args.class_num).cuda()
